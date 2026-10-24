@@ -1,43 +1,39 @@
-# Smart Pantry & Recipe Matcher
+# Community Pantry Inventory Tracker
 
-A small Python script that suggests recipes based on the ingredients you already have, helping reduce food waste (UN SDG 12: Responsible Consumption and Production).
+A minimal web app for food banks and community pantries to track non-perishable stock. It highlights low-stock items (under 10 units) so pantries can restock in time and avoid over-ordering, supporting UN SDG 2: Zero Hunger.
 
-## How it works
+**Stack:** React (Vite) frontend, Node.js + Express REST API, JSON file for persistence.
 
-1. Loads `recipes.csv` with pandas and parses each recipe's `;`-separated ingredients into a lowercase, trimmed list.
-2. Asks you for the pantry items you have.
-3. Scores each recipe by the percentage of its ingredients you already have, then prints a ranked list with calories, protein and any missing ingredients.
+## Features
 
-## Setup & Run
+- View inventory items with quantities
+- Add new items, update stock levels (edit the quantity and click away to save)
+- Summary of total items, total units and units per category
 
-With [uv](https://docs.astral.sh/uv/):
+## Run
 
-```bash
-uv venv
-uv pip install -r requirements.txt
-uv run pantry.py
-```
-
-Or with pip:
+Requires Node.js 18+. Use two terminals:
 
 ```bash
-pip install -r requirements.txt
-python pantry.py
+# Terminal 1 - API on http://localhost:3001
+cd server
+npm install
+npm start
+
+# Terminal 2 - UI on http://localhost:5173
+cd client
+npm install
+npm run dev
 ```
 
-Example:
+Open http://localhost:5173.
 
-```
-Enter your pantry items (comma-separated): egg, onion, rice, carrot, soy sauce
+## API
 
-Suggested meals:
-1. Fried Rice - 100% match (480 kcal, 14g protein)
-2. Chicken Stir Fry - 60% match (560 kcal, 38g protein)
-...
-```
+| Method | Route            | Body                            | Description        |
+| ------ | ---------------- | ------------------------------- | ------------------ |
+| GET    | `/api/items`     |                                 | List all items     |
+| POST   | `/api/items`     | `{ name, category, quantity }`  | Add an item        |
+| PUT    | `/api/items/:id` | `{ quantity }`                  | Update stock level |
 
-## Files
-
-- `pantry.py` – the script
-- `recipes.csv` – recipe database (`name, ingredients, calories, protein_g`); add your own rows
-- `requirements.txt` – dependencies
+Data is saved to `server/data.json`, created on first write.
