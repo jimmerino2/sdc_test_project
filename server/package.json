@@ -1,5 +1,5 @@
 {
-  "name": "pantry-server",
+  "name": "recipe-server",
   "private": true,
   "type": "module",
   "scripts": { "start": "node index.js" },

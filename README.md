@@ -1,14 +1,14 @@
-# Community Pantry Inventory Tracker
+# Pantry Recipe Finder
 
-A minimal web app for food banks and community pantries to track non-perishable stock. It highlights low-stock items (under 10 units) so pantries can restock in time and avoid over-ordering, supporting UN SDG 2: Zero Hunger.
+A simple web app that helps home cooks reduce food waste by suggesting recipes from ingredients they already have, supporting UN SDG 2: Zero Hunger (responsible consumption).
 
-**Stack:** React (Vite) frontend, Node.js + Express REST API, JSON file for persistence.
+**Stack:** React (Vite) frontend, Node.js + Express REST API, static JSON recipe dataset.
 
 ## Features
 
-- View inventory items with quantities
-- Add new items, update stock levels (edit the quantity and click away to save)
-- Summary of total items, total units and units per category
+- Enter available ingredients in a text field (comma-separated)
+- Matching recipes are fetched from the API and ranked by how much of the recipe you already have
+- Each recipe shows cooking time, calories, protein, the ingredients you can use and what's missing
 
 ## Run
 
@@ -30,10 +30,11 @@ Open http://localhost:5173.
 
 ## API
 
-| Method | Route            | Body                            | Description        |
-| ------ | ---------------- | ------------------------------- | ------------------ |
-| GET    | `/api/items`     |                                 | List all items     |
-| POST   | `/api/items`     | `{ name, category, quantity }`  | Add an item        |
-| PUT    | `/api/items/:id` | `{ quantity }`                  | Update stock level |
+`GET /api/recipes?ingredients=egg,rice,onion` returns recipes that use at least one of the ingredients, best match first:
 
-Data is saved to `server/data.json`, created on first write.
+```json
+[{ "name": "Fried Rice", "cookingTime": 15, "ingredients": ["rice", "egg", "..."],
+   "calories": 480, "protein": 14, "used": ["rice", "egg", "onion"], "missing": ["carrot", "soy sauce"] }]
+```
+
+Recipes live in `server/recipes.json`; add your own entries there.
