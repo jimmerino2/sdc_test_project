@@ -2,6 +2,15 @@
   "name": "recipe-server",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node index.js" },
-  "dependencies": { "cors": "^2.8.5", "express": "^4.21.0" }
+  "scripts": {
+    "db:init": "node --env-file=.env init-db.js",
+    "start": "node --env-file=.env index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.0"
+  }
 }
