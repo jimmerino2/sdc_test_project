@@ -33,10 +33,10 @@ function Login({ onToken }) {
       <input required type="email" placeholder="Email" value={form.email}
         onChange={(e) => setForm({ ...form, email: e.target.value })} />{" "}
       <input required type="password" placeholder="Password (8+ chars)" value={form.password}
-        onChange={(e) => setForm({ ...form, password: e.target.value })} />{" "}
-      <button>Log in</button>{" "}
-      <button type="button" onClick={submit("/register")}>Sign up</button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+        onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <button>Log in</button>
+      <button type="button" className="secondary" onClick={submit("/register")}>Sign up</button>
+      {error && <p className="error">{error}</p>}
     </form>
   );
 }
@@ -61,17 +61,21 @@ function AddHarvest({ token, onAdded }) {
   };
 
   return (
-    <form onSubmit={submit}>
-      <input required placeholder="Crop, e.g. tomatoes" value={form.crop}
-        onChange={(e) => setForm({ ...form, crop: e.target.value })} />{" "}
-      <input required type="number" min="0.1" step="0.1" placeholder="kg" style={{ width: 70 }} value={form.quantityKg}
-        onChange={(e) => setForm({ ...form, quantityKg: e.target.value })} />{" "}
-      <label>Good until{" "}
+    <form className="add-form" onSubmit={submit}>
+      <label>Crop
+        <input required placeholder="e.g. tomatoes" value={form.crop}
+          onChange={(e) => setForm({ ...form, crop: e.target.value })} />
+      </label>
+      <label>Weight (kg)
+        <input required className="qty-input" type="number" min="0.1" step="0.1" value={form.quantityKg}
+          onChange={(e) => setForm({ ...form, quantityKg: e.target.value })} />
+      </label>
+      <label>Good until
         <input required type="date" min={today()} value={form.availableUntil}
           onChange={(e) => setForm({ ...form, availableUntil: e.target.value })} />
-      </label>{" "}
+      </label>
       <button>Add surplus</button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p className="error">{error}</p>}
     </form>
   );
 }
@@ -115,57 +119,78 @@ export default function App() {
     refresh();
   };
 
-  const row = { borderBottom: "1px solid #ccc", padding: "0.5rem 0" };
   const mineIds = new Set(mine.map((h) => h.id));
+  const soon = (h) => (new Date(h.availableUntil) - new Date(today())) / 864e5 <= 3;
 
   return (
-    <div style={{ maxWidth: 650, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Garden Surplus Share</h1>
-      <p>Local gardeners list extra produce so it reaches food banks instead of the compost heap.</p>
-      {token ? <button onClick={() => saveToken(null)}>Log out</button> : <Login onToken={saveToken} />}
-
-      <p>
-        <strong>{summary.availableKg} kg</strong> ready for pickup · <strong>{summary.donatedKg} kg</strong> donated so far
-      </p>
-
-      <h2>Available harvests</h2>
-      {available.length === 0 && <p>Nothing listed right now.</p>}
-      {available.map((h) => (
-        <div key={h.id} style={row}>
-          <strong>{h.crop}</strong> · {h.quantityKg} kg · good until {h.availableUntil}
-          {mineIds.has(h.id) && " (yours)"}
+    <>
+      <header className="hero">
+        <div className="hero-inner">
+          <h1>Garden Surplus Share</h1>
+          <p>Local gardeners list extra produce so it reaches food banks instead of the compost heap.</p>
         </div>
-      ))}
+      </header>
 
-      {token && (
-        <>
-          <h2>List surplus produce</h2>
-          <AddHarvest token={token} onAdded={refresh} />
+      <main className="page">
+        <div className="auth">
+          {token ? <button className="secondary" onClick={() => saveToken(null)}>Log out</button> : <Login onToken={saveToken} />}
+        </div>
 
-          <h2>My harvests</h2>
-          {mine.length === 0 && <p>You haven't listed anything yet.</p>}
-          {mine.map((h) => (
-            <div key={h.id} style={row}>
-              <strong>{h.crop}</strong> · {h.quantityKg} kg · good until {h.availableUntil}
-              {h.status === "donated" ? (
-                <p>Donated to {h.foodBank}</p>
-              ) : (
-                <p>
-                  <select value={target[h.id] || foodBanks[0]?.id || ""}
-                    onChange={(e) => setTarget({ ...target, [h.id]: e.target.value })}>
-                    {foodBanks.map((fb) => <option key={fb.id} value={fb.id}>{fb.name} ({fb.address})</option>)}
-                  </select>{" "}
-                  <button onClick={() => donate(h)}>Mark donated</button>{" "}
-                  <button onClick={() => remove(h)}>Remove</button>
-                </p>
-              )}
+        <div className="stats">
+          <div className="stat"><strong>{summary.availableKg} kg</strong><span>ready for pickup</span></div>
+          <div className="stat"><strong>{summary.donatedKg} kg</strong><span>donated so far</span></div>
+        </div>
+
+        <h2>Available harvests</h2>
+        {available.length === 0 && <p className="empty">Nothing listed right now.</p>}
+        {available.map((h) => (
+          <div key={h.id} className="card">
+            <div className="card-head">
+              <span className="crop">{h.crop}{mineIds.has(h.id) && <span className="badge">yours</span>}</span>
+              <span className="qty">{h.quantityKg} kg</span>
             </div>
-          ))}
-        </>
-      )}
+            <div className="meta">
+              Good until {h.availableUntil}{soon(h) && <span className="badge soon">use soon</span>}
+            </div>
+          </div>
+        ))}
 
-      <h2>Partner food banks</h2>
-      <ul>{foodBanks.map((fb) => <li key={fb.id}>{fb.name} — {fb.address}</li>)}</ul>
-    </div>
+        {token && (
+          <>
+            <h2>List surplus produce</h2>
+            <AddHarvest token={token} onAdded={refresh} />
+
+            <h2>My harvests</h2>
+            {mine.length === 0 && <p className="empty">You haven't listed anything yet.</p>}
+            {mine.map((h) => (
+              <div key={h.id} className="card">
+                <div className="card-head">
+                  <span className="crop">{h.crop}</span>
+                  <span className="qty">{h.quantityKg} kg</span>
+                </div>
+                <div className="meta">Good until {h.availableUntil}</div>
+                {h.status === "donated" ? (
+                  <div className="meta">Donated to {h.foodBank}<span className="badge">donated</span></div>
+                ) : (
+                  <div className="actions">
+                    <select value={target[h.id] || foodBanks[0]?.id || ""}
+                      onChange={(e) => setTarget({ ...target, [h.id]: e.target.value })}>
+                      {foodBanks.map((fb) => <option key={fb.id} value={fb.id}>{fb.name} ({fb.address})</option>)}
+                    </select>
+                    <button onClick={() => donate(h)}>Mark donated</button>
+                    <button className="danger" onClick={() => remove(h)}>Remove</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
+        )}
+
+        <h2>Partner food banks</h2>
+        <ul className="banks">
+          {foodBanks.map((fb) => <li key={fb.id}>{fb.name} <span>— {fb.address}</span></li>)}
+        </ul>
+      </main>
+    </>
   );
 }
