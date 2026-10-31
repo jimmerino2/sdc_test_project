@@ -1,5 +1,5 @@
 {
-  "name": "recipe-server",
+  "name": "garden-server",
   "private": true,
   "type": "module",
   "scripts": {

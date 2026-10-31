@@ -2,12 +2,12 @@ import pg from "pg";
 
 export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
-// Recipes (with their ingredient list) as camelCase JSON; `extra` is an optional join/where.
-export const recipesQuery = (extra = "") => `
-  SELECT r.id, r.name, r.cooking_time AS "cookingTime", r.calories, r.protein,
-         array_agg(ri.ingredient ORDER BY ri.ingredient) AS ingredients
-  FROM recipes r
-  JOIN recipe_ingredients ri ON ri.recipe_id = r.id
+// Harvests as camelCase JSON; `extra` is an optional join/where (must keep the h/fb aliases).
+export const harvestsQuery = (extra = "") => `
+  SELECT h.id, h.crop, h.quantity_kg::float AS "quantityKg",
+         to_char(h.available_until, 'YYYY-MM-DD') AS "availableUntil",
+         h.status, fb.name AS "foodBank"
+  FROM harvests h
+  LEFT JOIN food_banks fb ON fb.id = h.food_bank_id
   ${extra}
-  GROUP BY r.id
-  ORDER BY r.name`;
+  ORDER BY h.available_until, h.id`;

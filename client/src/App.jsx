@@ -41,69 +41,131 @@ function Login({ onToken }) {
   );
 }
 
+const today = () => new Date().toISOString().slice(0, 10);
+
+function AddHarvest({ token, onAdded }) {
+  const empty = { crop: "", quantityKg: "", availableUntil: today() };
+  const [form, setForm] = useState(empty);
+  const [error, setError] = useState("");
+
+  const submit = async (e) => {
+    e.preventDefault();
+    try {
+      await api("/harvests", { method: "POST", body: form, token });
+      setForm(empty);
+      setError("");
+      onAdded();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <form onSubmit={submit}>
+      <input required placeholder="Crop, e.g. tomatoes" value={form.crop}
+        onChange={(e) => setForm({ ...form, crop: e.target.value })} />{" "}
+      <input required type="number" min="0.1" step="0.1" placeholder="kg" style={{ width: 70 }} value={form.quantityKg}
+        onChange={(e) => setForm({ ...form, quantityKg: e.target.value })} />{" "}
+      <label>Good until{" "}
+        <input required type="date" min={today()} value={form.availableUntil}
+          onChange={(e) => setForm({ ...form, availableUntil: e.target.value })} />
+      </label>{" "}
+      <button>Add surplus</button>
+      {error && <p style={{ color: "crimson" }}>{error}</p>}
+    </form>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
-  const [text, setText] = useState("");
-  const [recipes, setRecipes] = useState(null);
-  const [favorites, setFavorites] = useState([]);
+  const [available, setAvailable] = useState([]);
+  const [summary, setSummary] = useState({ availableKg: 0, donatedKg: 0 });
+  const [foodBanks, setFoodBanks] = useState([]);
+  const [mine, setMine] = useState([]);
+  const [target, setTarget] = useState({}); // harvest id -> chosen food bank id
 
   const saveToken = (t) => {
     t ? localStorage.setItem("token", t) : localStorage.removeItem("token");
     setToken(t);
   };
 
-  // Load favorites on login; an expired/invalid token logs the user out
-  useEffect(() => {
-    if (!token) return setFavorites([]);
-    api("/favorites", { token }).then(setFavorites).catch(() => saveToken(null));
-  }, [token]);
-
-  const search = async (e) => {
-    e.preventDefault();
-    setRecipes(await api(`/recipes?ingredients=${encodeURIComponent(text)}`));
+  const refresh = async () => {
+    const [h, s] = await Promise.all([api("/harvests"), api("/summary")]);
+    setAvailable(h);
+    setSummary(s);
+    if (!token) return setMine([]);
+    try {
+      setMine(await api("/my-harvests", { token }));
+    } catch {
+      saveToken(null); // an expired/invalid token logs the user out
+    }
   };
 
-  const toggleFavorite = async (recipe) => {
-    const isFav = favorites.some((f) => f.id === recipe.id);
-    await api(`/favorites/${recipe.id}`, { method: isFav ? "DELETE" : "POST", token });
-    setFavorites(await api("/favorites", { token }));
+  useEffect(() => { api("/food-banks").then(setFoodBanks); }, []);
+  useEffect(() => { refresh(); }, [token]);
+
+  const donate = async (h) => {
+    const foodBankId = target[h.id] || foodBanks[0]?.id;
+    await api(`/harvests/${h.id}/donate`, { method: "POST", body: { foodBankId }, token });
+    refresh();
   };
 
-  const RecipeCard = ({ r }) => (
-    <div style={{ borderBottom: "1px solid #ccc", padding: "0.5rem 0" }}>
-      <h3>{r.name}</h3>
-      <p>{r.cookingTime} min · {r.calories} kcal · {r.protein}g protein</p>
-      <p>Ingredients: {r.ingredients.join(", ")}</p>
-      {r.used && <p>You have: {r.used.join(", ")}</p>}
-      {token && (
-        <button onClick={() => toggleFavorite(r)}>
-          {favorites.some((f) => f.id === r.id) ? "Remove favorite" : "Save favorite"}
-        </button>
-      )}
-    </div>
-  );
+  const remove = async (h) => {
+    await api(`/harvests/${h.id}`, { method: "DELETE", token });
+    refresh();
+  };
+
+  const row = { borderBottom: "1px solid #ccc", padding: "0.5rem 0" };
+  const mineIds = new Set(mine.map((h) => h.id));
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Pantry Recipe Finder</h1>
+    <div style={{ maxWidth: 650, margin: "2rem auto", fontFamily: "sans-serif" }}>
+      <h1>Garden Surplus Share</h1>
+      <p>Local gardeners list extra produce so it reaches food banks instead of the compost heap.</p>
       {token ? <button onClick={() => saveToken(null)}>Log out</button> : <Login onToken={saveToken} />}
 
-      <h2>Find recipes</h2>
-      <form onSubmit={search}>
-        <input style={{ width: "70%" }} placeholder="Ingredients you have, e.g. egg, rice, onion"
-          value={text} onChange={(e) => setText(e.target.value)} />{" "}
-        <button>Find recipes</button>
-      </form>
-      {recipes?.length === 0 && <p>No matching recipes found.</p>}
-      {recipes?.map((r) => <RecipeCard key={r.id} r={r} />)}
+      <p>
+        <strong>{summary.availableKg} kg</strong> ready for pickup · <strong>{summary.donatedKg} kg</strong> donated so far
+      </p>
+
+      <h2>Available harvests</h2>
+      {available.length === 0 && <p>Nothing listed right now.</p>}
+      {available.map((h) => (
+        <div key={h.id} style={row}>
+          <strong>{h.crop}</strong> · {h.quantityKg} kg · good until {h.availableUntil}
+          {mineIds.has(h.id) && " (yours)"}
+        </div>
+      ))}
 
       {token && (
         <>
-          <h2>My favorites</h2>
-          {favorites.length === 0 && <p>No favorites yet.</p>}
-          {favorites.map((r) => <RecipeCard key={r.id} r={r} />)}
+          <h2>List surplus produce</h2>
+          <AddHarvest token={token} onAdded={refresh} />
+
+          <h2>My harvests</h2>
+          {mine.length === 0 && <p>You haven't listed anything yet.</p>}
+          {mine.map((h) => (
+            <div key={h.id} style={row}>
+              <strong>{h.crop}</strong> · {h.quantityKg} kg · good until {h.availableUntil}
+              {h.status === "donated" ? (
+                <p>Donated to {h.foodBank}</p>
+              ) : (
+                <p>
+                  <select value={target[h.id] || foodBanks[0]?.id || ""}
+                    onChange={(e) => setTarget({ ...target, [h.id]: e.target.value })}>
+                    {foodBanks.map((fb) => <option key={fb.id} value={fb.id}>{fb.name} ({fb.address})</option>)}
+                  </select>{" "}
+                  <button onClick={() => donate(h)}>Mark donated</button>{" "}
+                  <button onClick={() => remove(h)}>Remove</button>
+                </p>
+              )}
+            </div>
+          ))}
         </>
       )}
+
+      <h2>Partner food banks</h2>
+      <ul>{foodBanks.map((fb) => <li key={fb.id}>{fb.name} — {fb.address}</li>)}</ul>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { pool, recipesQuery } from "./db.js";
+import { pool, harvestsQuery } from "./db.js";
 
 const SECRET = process.env.JWT_SECRET;
 if (!SECRET || !process.env.DATABASE_URL) {
@@ -60,54 +60,78 @@ app.post("/api/login", wrap(async (req, res) => {
   res.json({ token: sign(rows[0]) });
 }));
 
-// --- Recipes ---
+// --- Public views ---
 
-// GET /api/recipes?ingredients=egg,rice -> recipes using at least one, best match first
-app.get("/api/recipes", wrap(async (req, res) => {
-  const have = String(req.query.ingredients || "")
-    .toLowerCase()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const { rows } = await pool.query(recipesQuery());
-  const matches = rows
-    .map((r) => ({
-      ...r,
-      used: r.ingredients.filter((i) => have.includes(i)),
-      missing: r.ingredients.filter((i) => !have.includes(i)),
-    }))
-    .filter((r) => r.used.length > 0)
-    .sort((a, b) => b.used.length / b.ingredients.length - a.used.length / a.ingredients.length);
-
-  res.json(matches);
+app.get("/api/food-banks", wrap(async (req, res) => {
+  const { rows } = await pool.query("SELECT id, name, address FROM food_banks ORDER BY name");
+  res.json(rows);
 }));
 
-// --- Favorites (login required) ---
-
-app.get("/api/favorites", auth, wrap(async (req, res) => {
+// Produce still ready for distribution (not donated, not past its date), soonest-to-spoil first
+app.get("/api/harvests", wrap(async (req, res) => {
   const { rows } = await pool.query(
-    recipesQuery("JOIN favorites f ON f.recipe_id = r.id AND f.user_id = $1"),
-    [req.userId]
+    harvestsQuery("WHERE h.status = 'available' AND h.available_until >= CURRENT_DATE")
   );
   res.json(rows);
 }));
 
-app.post("/api/favorites/:recipeId", auth, wrap(async (req, res) => {
+// Community totals for the dashboard
+app.get("/api/summary", wrap(async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT
+      COALESCE(SUM(quantity_kg) FILTER (WHERE status = 'available' AND available_until >= CURRENT_DATE), 0)::float AS "availableKg",
+      COALESCE(SUM(quantity_kg) FILTER (WHERE status = 'donated'), 0)::float AS "donatedKg"
+    FROM harvests`);
+  res.json(rows[0]);
+}));
+
+// --- Gardener's own harvests (login required) ---
+
+app.get("/api/my-harvests", auth, wrap(async (req, res) => {
+  const { rows } = await pool.query(harvestsQuery("WHERE h.user_id = $1"), [req.userId]);
+  res.json(rows);
+}));
+
+app.post("/api/harvests", auth, wrap(async (req, res) => {
+  const { crop, quantityKg, availableUntil } = req.body;
+  const qty = Number(quantityKg);
+  if (!String(crop || "").trim() || !(qty > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(availableUntil || "")) {
+    return res.status(400).json({ error: "crop, a quantity above 0 and an available-until date are required" });
+  }
   try {
     await pool.query(
-      "INSERT INTO favorites (user_id, recipe_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-      [req.userId, req.params.recipeId]
+      "INSERT INTO harvests (user_id, crop, quantity_kg, available_until) VALUES ($1, $2, $3, $4)",
+      [req.userId, crop.trim().toLowerCase(), qty, availableUntil]
     );
-    res.status(204).end();
+    res.status(201).end();
   } catch (err) {
-    if (err.code === "23503" || err.code === "22P02") return res.status(404).json({ error: "recipe not found" });
+    if (err.code === "22008" || err.code === "22007") return res.status(400).json({ error: "invalid date" });
     throw err;
   }
 }));
 
-app.delete("/api/favorites/:recipeId", auth, wrap(async (req, res) => {
-  await pool.query("DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2", [req.userId, req.params.recipeId]);
+// Mark one of your harvests as handed over to a food bank
+app.post("/api/harvests/:id/donate", auth, wrap(async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE harvests SET status = 'donated', food_bank_id = $1
+       WHERE id = $2 AND user_id = $3 AND status = 'available'`,
+      [req.body.foodBankId, req.params.id, req.userId]
+    );
+    if (!rowCount) return res.status(404).json({ error: "available harvest not found" });
+    res.status(204).end();
+  } catch (err) {
+    if (err.code === "23503" || err.code === "22P02") return res.status(404).json({ error: "food bank not found" });
+    throw err;
+  }
+}));
+
+app.delete("/api/harvests/:id", auth, wrap(async (req, res) => {
+  try {
+    await pool.query("DELETE FROM harvests WHERE id = $1 AND user_id = $2", [req.params.id, req.userId]);
+  } catch (err) {
+    if (err.code !== "22P02") throw err;
+  }
   res.status(204).end();
 }));
 
