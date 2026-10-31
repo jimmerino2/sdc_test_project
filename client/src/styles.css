@@ -111,3 +111,20 @@ button.danger:hover { background: #fbeaea; }
 @media (max-width: 480px) {
   .stats { grid-template-columns: 1fr; }
 }
+
+.section-head { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+.section-head h2 { margin: 0 0 10px; }
+.filters { display: flex; gap: 8px; margin-bottom: 10px; }
+.filters select { padding: 5px 8px; font-size: 0.9rem; }
+
+.week-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.week-label { font-weight: 600; }
+button:disabled { opacity: 0.4; cursor: default; }
+button.secondary:disabled:hover { background: #fff; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+.chips .badge { margin-left: 0; }
+.lines { list-style: none; padding: 0; margin: 10px 0 0; border-top: 1px solid var(--line); }
+.lines li { display: flex; gap: 10px; padding: 5px 0; font-size: 0.92rem; text-transform: capitalize; }
+.lines li span { color: var(--muted); min-width: 90px; text-transform: none; }
+.lines li em { margin-left: auto; text-transform: none; font-style: normal; color: var(--green); font-weight: 600; }

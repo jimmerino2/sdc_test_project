@@ -1,18 +1,19 @@
-DROP TABLE IF EXISTS harvests, food_banks, users;
+-- Accounts, partner food banks and harvest inventory.
+-- IF NOT EXISTS so databases created by the earlier schema.sql adopt the migration history cleanly.
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id            SERIAL PRIMARY KEY,
   email         TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL
 );
 
-CREATE TABLE food_banks (
+CREATE TABLE IF NOT EXISTS food_banks (
   id      SERIAL PRIMARY KEY,
   name    TEXT NOT NULL UNIQUE,
   address TEXT NOT NULL
 );
 
-CREATE TABLE harvests (
+CREATE TABLE IF NOT EXISTS harvests (
   id              SERIAL PRIMARY KEY,
   user_id         INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   crop            TEXT NOT NULL,
